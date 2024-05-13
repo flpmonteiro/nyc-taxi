@@ -1,1 +1,1 @@
-DOWNLOAD_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data/{}_tripdata_{}-{:02d}.parquet"
+DOWNLOAD_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data/{}_tripdata_{}.parquet"
