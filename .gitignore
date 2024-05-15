@@ -1,5 +1,6 @@
 tmp*/
 *.parquet
+*.csv
 *.duckdb
 *.duckdb.wal
 

@@ -136,3 +136,52 @@ def taxi_trips(context: AssetExecutionContext, database:DuckDBResource) -> None:
 
     with database.get_connection() as conn:
         conn.execute(query)
+
+@asset
+def download_zones_csv() -> None:
+    url = constants.TAXI_ZONES_URL
+    file_name = Path(url).name
+    data_raw_path = Path('data/raw')
+    data_raw_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        with open(data_raw_path/file_name, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP Error: {e}")
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection Error: {e}")
+    except requests.exceptions.Timeout as e:
+        print(f"Timeout Error: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading the file: {e}")
+
+
+@asset(
+    deps=['download_zones_csv'],
+)
+def load_taxi_zones(database:DuckDBResource) -> None:
+
+    query = f"""
+        create table if not exists taxi_zones (
+            location_id integer,
+            borough varchar,
+            zone varchar,
+            service_zone varchar,
+        );
+
+        insert into taxi_zones
+        select
+            LocationID,
+            Borough,
+            Zone,
+            service_zone
+        from '{constants.TAXI_ZONES_FILE_PATH}';
+    """
+
+    with database.get_connection() as conn:
+        conn.execute(query)
