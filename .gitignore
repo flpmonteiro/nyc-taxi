@@ -1,5 +1,7 @@
 tmp*/
 *.parquet
+*.duckdb
+*.duckdb.wal
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

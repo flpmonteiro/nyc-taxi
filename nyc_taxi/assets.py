@@ -24,7 +24,7 @@ from . import constants
 
 # TODO: get from .env file
 start_date = '2023-01-01'
-end_date = '2023-12-31'
+end_date = '2024-01-01'
 
 monthly_partition = MonthlyPartitionsDefinition(
     start_date=start_date,
@@ -51,14 +51,13 @@ def download_data(context: AssetExecutionContext):
     url = constants.DOWNLOAD_URL.format(color,year_month)
     file_name = Path(url).name
     data_raw_path = Path('data/raw')
-    full_path = data_raw_path / f'{year_month[:4]}' / f'{year_month[5:]}'
-    full_path.mkdir(parents=True, exist_ok=True)
+    data_raw_path.mkdir(parents=True, exist_ok=True)
 
     try:
         response = requests.get(url, stream=True)
         response.raise_for_status()
 
-        with open(full_path/file_name, 'wb') as file:
+        with open(data_raw_path/file_name, 'wb') as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
     except requests.exceptions.HTTPError as e:
@@ -80,39 +79,59 @@ database_resource = DuckDBResource(
     partitions_def=monthly_partition,
 )
 def taxi_trips(context: AssetExecutionContext, database:DuckDBResource) -> None:
+    color = 'yellow'
     year_month = context.partition_key[:-3]
+    table_name = f'{color}_tripdata'
 
     query = f"""
-        create table if not exists trips (
+        create table if not exists {table_name} (
             vendor_id integer,
-            pickup_zone_id integer,
-            dropoff_zone_id integer,
-            rate_code_id double,
-            payment_type integer,
-            dropoff_datetime timestamp,
             pickup_datetime timestamp,
+            dropoff_datetime timestamp,
+            passenger_count bigint,
             trip_distance double,
-            passenger_count double,
+            ratecode_id bigint,
+            store_and_fwd_flag varchar,
+            pickup_location_id integer,
+            dropoff_location_id integer,
+            payment_type bigint,
+            fare_amount double,
+            extra double,
+            mta_tax double,
+            tip_amount double,
+            tolls_amount double,
+            improvement_surcharge double,
             total_amount double,
+            congestion_surcharge double,
+            airport_fee double,
             partition_date varchar
         );
 
-        delete from trips where partition_date = '{month_to_fetch}';
+        delete from {table_name} where partition_date = '{year_month}';
 
-        insert into trips
+        insert into {table_name}
         select
             VendorID,
+            tpep_pickup_datetime,
+            tpep_dropoff_datetime,
+            passenger_count,
+            trip_distance,
+            RatecodeID,
+            store_and_fwd_flag,
             PULocationID,
             DOLocationID,
-            RatecodeID,
             payment_type,
-            tpep_dropoff_datetime,
-            tpep_pickup_datetime,
-            trip_distance,
-            passenger_count,
+            fare_amount,
+            extra,
+            mta_tax,
+            tip_amount,
+            tolls_amount,
+            improvement_surcharge,
             total_amount,
-            '{month_to_fetch}' as partition_date
-        from '{constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)}';
+            congestion_surcharge,
+            Airport_fee,
+            '{year_month}' as partition_date
+        from '{constants.TRIPDATA_FILE_PATH.format(color, year_month)}';
     """
 
     with database.get_connection() as conn:
